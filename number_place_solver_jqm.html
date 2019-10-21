@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="jp">
+<head>
+<meta charset="utf-8">
+<title>ナンプレソルバー</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"> 
+<link rel="stylesheet" href="https://code.jquery.com/mobile/1.1.0/jquery.mobile-1.1.0.min.css" />
+<script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="https://code.jquery.com/mobile/1.1.0/jquery.mobile-1.1.0.min.js"></script>
+<style>
+#TABLE {border-collapse:collapse;border-spacing:0;border:2px solid #000000; margin: 0 auto;}
+#TABLE td{width:1.5em ;height: 1.5em; text-align:center; border:1px solid;}
+#TABLE tr.tsep td{border-top-width:2px;}
+#TABLE td.lsep{border-left-width:2px;}
+#button { margin: 0 auto;}
+#button .ui-btn { margin:1px;}
+</style>
+<script>
+var cells = new Array(9);
+
+var work_table = new Array(9);
+var x_mask = new Array(9);
+var y_mask = new Array(9);
+var a_mask = new Array(9);
+
+function print_table() {
+  for ( var i = 0; i < 9; i++) {
+    for ( var j = 0; j < 9; j++) {
+      cells[i][j].innerHTML = work_table[i][j];
+    }
+  }
+}
+
+function setnum( y, x, v) {
+  var i, j;
+  var m = 1 << v;
+  var x0 = x - x % 3;
+  var y0 = y - y % 3;
+  work_table[y][x] = v;
+
+  for ( i = 0; i < 9; i++) {
+    x_mask[y][i] &= ~m;
+    y_mask[i][x] &= ~m;
+    if (work_table[y][i] == 0 && ( x_mask[y][i] & y_mask[y][i] & a_mask[y][i]) == 0) return false;
+    if (work_table[i][x] == 0 && ( x_mask[i][x] & y_mask[i][x] & a_mask[i][x]) == 0) return false;
+  }
+  for ( i = 0; i < 3; i++) {
+    for ( j = 0; j < 3; j++) {
+      a_mask[y0+i][x0+j] &= ~m;
+      if (work_table[y0+i][x0+j] == 0 && 
+          (x_mask[y0+i][x0+j] & y_mask[y0+i][x0+j] & a_mask[y0+i][x0+j]) == 0) return false;
+    }
+  }
+
+  return true;
+}
+
+function unsetnum( y, x) {
+  var i, j;
+  var v = work_table[ y][ x];
+  var m = 1 << v;
+  var x0 = x - x % 3;
+  var y0 = y - y % 3;
+
+  work_table[ y][ x] = 0;
+  for ( i = 0; i < 9; i++) {
+    x_mask[y][i] |= m;
+    y_mask[i][x] |= m;
+  }
+  for ( i = 0; i < 3; i++) {
+    for ( j = 0; j < 3; j++) {
+      a_mask[y0+i][x0+j] |= m;
+    }
+  }
+}
+
+function init_array() {
+
+  for ( var i = 0; i < 9; i++) {
+    work_table[i] = [0,0,0, 0,0,0, 0,0,0];
+    x_mask[i] = [0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe];
+    y_mask[i] = [0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe];
+    a_mask[i] = [0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe, 0x3fe,0x3fe,0x3fe];
+  }
+
+  for ( var i = 0; i < 9; i++) {
+    for ( var j = 0; j < 9; j++) {
+      var v = cells[i][j].innerText;
+      var m = x_mask[i][j] & y_mask[i][j] & a_mask[i][j];
+      if ( v > 0 &&  ((m  & (1 << v)) == 0 || !setnum( i, j, v-0))) {
+        window.alert( "初期状態エラー：("+i+","+j+")");
+        return false;
+      }
+    }
+  }
+
+  if ( selcell != null) {
+    selcell.style['background-color'] = selcell.innerText > 0 ? '#dddddd' : 'white';
+  }
+  return true;
+}
+
+function solv( y, x) {
+  var m, v;
+
+  if ( x >= 9) { 
+    x = 0; 
+    if ( ++y >= 9) {
+      print_table( work_table);
+throw new Error;
+      return;
+    }
+  }
+//printf( " %d%d", y, x);
+  if ( work_table[y][x] != 0) { solv( y, x + 1); return;}
+  m = x_mask[y][x] & y_mask[y][x] & a_mask[y][x];
+  for ( v = 1; v <= 9; v++) {
+    if (( m & (1 << v)) != 0) {
+//printf( " %d%d->%d", y, x, v, x_mask[0][7] & y_mask[0][7]);
+      if ( setnum( y, x, v)) {
+        solv( y, x + 1);
+      }
+      unsetnum( y, x);
+    }
+  }
+}
+
+var selcell = null;
+
+function setval( e) {
+  var v = e.srcElement.value;
+  if ( v == '探索') {
+    try {
+      if ( init_array()) solv(0,0);
+    } catch ( e) {
+    }
+  } else if ( v == '全消去') {
+    $('#TABLE td').html(' ');
+    $('#TABLE td').css('background-color','white');
+  } else if ( selcell != null) {
+    var n = v - 0;
+    selcell.innerHTML = (isNaN( n) || n < 1) ? ' ' : n;
+  }
+}
+
+function selpos( e) {
+  if ( selcell != null) {
+    selcell.style['background-color'] = selcell.innerText > 0 ? '#dddddd' : 'white';
+  }
+  selcell = e.srcElement;
+  selcell.style['background-color'] = '#ffdddd';
+}
+
+window.onload = function () {
+  var tbl = document.getElementById( "TABLE");
+  var rows = tbl.rows;
+  for ( var i = 0; i < rows.length; i++) {
+    cells[ i] = rows[ i].cells;
+  }
+
+  tbl.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var file = e.dataTransfer.files[0];
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var text = e.target.result;
+      var lines = text.split(/\s*\n/);
+      var y = 0;
+      for ( var i = 0; i < lines.length; i++) {
+        var col = lines[ i].split(/\s+/);
+        if ( col.length >= 9) {
+          for ( var j = 0; j < 9; j++) {
+            cells[y][j].innerHTML = col[j] == 0 ? ' ': col[j];
+            cells[y][j].style['background-color'] = col[j] == 0 ? 'white' : '#eeeeee';
+          }
+          y++;
+        }
+      }
+    }
+    reader.readAsText(file);
+  }, false);
+
+  var el = document.getElementById("button").getElementsByTagName("input");
+  for ( var i = 0; i < el.length; i++) el[i].onclick = setval;
+  el = document.getElementById("TABLE").getElementsByTagName("td");
+  for ( var i = 0; i < el.length; i++) el[i].onclick = selpos;
+
+}
+
+
+</script>
+</head>
+<body>
+
+<div data-role="page">
+ <div data-role="header">
+ <h1>ナンプレソルバー</h1>
+ </div>
+
+ <div data-role="content" class="content">
+
+<table id="TABLE">
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr class="tsep">
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr class="tsep">
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+<tr>
+<td></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+<td class="lsep"></td><td></td><td></td>
+</tr>
+</table>
+
+<table id="button">
+<tr>
+ <td><input type="button" value="1"></td>
+ <td><input type="button" value="2"></td>
+ <td><input type="button" value="3"></td>
+ <td><input type="button" value="　"></td>
+</tr>
+<tr>
+ <td><input type="button" value="4"></td>
+ <td><input type="button" value="5"></td>
+ <td><input type="button" value="6"></td>
+ <td><input type="button" value="全消去"></td>
+</tr>
+<tr>
+ <td><input type="button" value="7"></td>
+ <td><input type="button" value="8"></td>
+ <td><input type="button" value="9"></td>
+ <td><input type="button" value="探索"></td>
+</tr>
+</table>
+ </div>
+
+ <div data-role="footer">
+ <h4>&copy; Kei</h4>
+ </div>
+</div>
+</body>
+</html>
